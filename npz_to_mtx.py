@@ -27,7 +27,7 @@ from common import Converter, logger_format, logger_dateformat
 logger = logging.getLogger()
 
 
-class NpxToMtxConverter(Converter):
+class NpzToMtxConverter(Converter):
     def __init__(self):
         super().__init__(source_ext=".npz", target_ext=".mtx")
 
@@ -56,7 +56,7 @@ def main(args):
     Entry point.
     """
 
-    converter = NpxToMtxConverter()
+    converter = NpzToMtxConverter()
 
     converter.validate_args(args)
 
