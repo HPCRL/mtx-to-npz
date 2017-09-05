@@ -22,8 +22,8 @@ import argparse
 
 from enum import Enum, auto
 
-import numpy
 import scipy.io
+import scipy.sparse
 
 logger = logging.getLogger()
 logger_format = '%(asctime)s | %(levelname)s | %(module)s | %(message)s'
@@ -88,7 +88,8 @@ def main(args):
     matrix = scipy.io.mmread(source_path).tocsr()
 
     logger.info(f"Saving {os.path.basename(target_path)}")
-    numpy.savez(target_path, matrix)
+    # Don't compress, to save memory
+    scipy.sparse.save_npz(target_path, matrix, compressed=False)  # TODO: does this actually save memory?
 
 
 if __name__ == '__main__':
