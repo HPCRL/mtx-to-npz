@@ -1,6 +1,17 @@
-Converts matrix market `.mtx` files to scipy sparse `.npz` files.
+Converts between matrix market `.mtx` files and scipy sparse `.npz` files.
 
 ## Usage
+
+### `mtx_to_npz.py`
+
+Convert `.mtx` files to `.npz` files.
+
+### `npz_to_mtx.py`
+
+Convert `.npz` files to `.mtx` files.
+This will only work if the `.npz` files were generated using `scipy.sparse.savenz`.
+
+## Options
 
 Invoke like this:
 
@@ -10,15 +21,15 @@ python mtx_to_npz.py --help
 
 Available operations:
 
-__`python mtx_to_npz.py <source-file>`__
+### `python mtx_to_npz.py <source-file>`
 
 Converts and saves the file in place.
 
-__`python mtx_to_npz.py <source-file> -t <directory-path>`__
+### `python mtx_to_npz.py <source-file> -t <directory-path>`
 
 Converts and saves the file to the target directory.
 
-__`python mtx_to_npz.py <source-file> -t <file-path>`__
+### `python mtx_to_npz.py <source-file> -t <file-path>`
 
 Converts and saves to a specified file (which should not already exist).
 

@@ -1,6 +1,6 @@
 """
 ===========================
-Converts matrix market files to ndarray npz files.
+Converts ndarray npz files to matrix market files.
 ===========================
 
 Dr. Cai Wingfield
@@ -27,9 +27,9 @@ from common import Converter, logger_format, logger_dateformat
 logger = logging.getLogger()
 
 
-class MtxToNpzConverter(Converter):
+class NpxToMtxConverter(Converter):
     def __init__(self):
-        super().__init__(source_ext=".mtx", target_ext=".npz")
+        super().__init__(source_ext=".npz", target_ext=".mtx")
 
     def convert_file(self, source_path: str, target_path: str, skip: bool) -> None:
 
@@ -42,14 +42,13 @@ class MtxToNpzConverter(Converter):
             else:
                 raise FileExistsError(target_path)
 
-        # Load and convert the file
+        # Load the file
         logger.info(f"Loading {os.path.basename(source_path)}")
-        matrix = scipy.io.mmread(source_path).tocsr()
+        matrix = scipy.sparse.load_npz(source_path).tocsr()
 
         # Save the file
         logger.info(f"Saving {os.path.basename(target_path)}")
-        # Don't compress, to save memory.  TODO: does this actually save memory?
-        scipy.sparse.save_npz(target_path, matrix, compressed=False)
+        scipy.io.mmwrite(target_path, matrix)
 
 
 def main(args):
@@ -57,7 +56,7 @@ def main(args):
     Entry point.
     """
 
-    converter = MtxToNpzConverter()
+    converter = NpxToMtxConverter()
 
     converter.validate_args(args)
 
@@ -72,7 +71,7 @@ if __name__ == '__main__':
     logging.basicConfig(format=logger_format, datefmt=logger_dateformat, level=logging.INFO)
     logger.info("Running %s" % " ".join(sys.argv))
 
-    parser = argparse.ArgumentParser(description='Convert matrix market text files to npz files.')
+    parser = argparse.ArgumentParser(description='Convert npz files to matrix market text files.')
 
     parser.add_argument("source", type=str, help="Path to a .mtx file or a directory. Use '-r' flag for directories.")
     parser.add_argument("--target", "-t", metavar="PATH", type=str, help="Target file or directory.")
