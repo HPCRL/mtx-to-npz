@@ -48,7 +48,7 @@ class NpzToMtxConverter(Converter):
 
         # Save the file
         logger.info(f"Saving {os.path.basename(target_path)}")
-        scipy.io.mmwrite(target_path, matrix)
+        scipy.io.mmwrite(target_path, matrix, symmetry="general")
 
 
 def main(args):
