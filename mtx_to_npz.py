@@ -58,14 +58,14 @@ def main(args):
 
     validate_args(args)
 
-    mode = get_mode(args.recursive, args.target)
+    mode, skip = get_mode(args)
 
     source_path, target_path = get_paths(args, mode)
 
-    do_conversion(mode, source_path, target_path)
+    do_conversion(mode, source_path, target_path, skip)
 
 
-def do_conversion(mode, source_path, target_path):
+def do_conversion(mode: ExecutionMode, source_path: str, target_path: str, skip: bool) -> None:
     """
     Do the appropriate conversion based on program mode.
     """
@@ -75,10 +75,10 @@ def do_conversion(mode, source_path, target_path):
     ]:
         # Get all source files
         source_paths = glob.glob(os.path.join(source_path, "*" + source_ext))
-        convert_files(source_paths, target_path)
+        convert_files(source_paths, target_path, skip)
 
     else:
-        convert_file(source_path, target_path)
+        convert_file(source_path, target_path, skip)
 
 
 def get_paths(args, mode: ExecutionMode):
@@ -139,9 +139,10 @@ def get_paths(args, mode: ExecutionMode):
     return source_path, target_path
 
 
-def validate_args(args):
+def validate_args(args) -> None:
     """
     Make sure specified args are in a legal state.
+    Raise errors if not.
     """
 
     # recursive => source is dir
@@ -160,32 +161,39 @@ def validate_args(args):
         raise NotADirectoryError(args.source)
 
 
-def get_mode(recursive: bool, target: str) -> ExecutionMode:
+def get_mode(args):
     """
     Determine the mode of execution of the program.
     """
 
+    recursive = args.recursive
+    target = args.target
+    skip = args.skip
+
+    # mode
     if recursive:
         if target:
             logger.info("Mode: Converting all files to target directory")
-            return ExecutionMode.all_to_dir
+            mode = ExecutionMode.all_to_dir
         else:
             logger.info("Mode: Converting all files in place")
-            return ExecutionMode.all_in_place
+            mode = ExecutionMode.all_in_place
     else:
         if target:
             if os.path.isdir(target):
                 logger.info("Mode: Convert file to target directory")
-                return ExecutionMode.file_to_dir
+                mode = ExecutionMode.file_to_dir
             else:
                 logger.info("Mode: Convert file to target file")
-                return ExecutionMode.file_to_file
+                mode = ExecutionMode.file_to_file
         else:
             logger.info("Mode: Convert file in place")
-            return ExecutionMode.file_in_place
+            mode = ExecutionMode.file_in_place
+
+    return mode, skip
 
 
-def convert_files(source_paths: List[str], target_dir: str) -> None:
+def convert_files(source_paths: List[str], target_dir: str, skip: bool) -> None:
     """
     Convert multiple files from mtx to npz.
     """
@@ -195,17 +203,21 @@ def convert_files(source_paths: List[str], target_dir: str) -> None:
         target_filename = os.path.splitext(source_filename)[0] + target_ext
         target_path = os.path.join(target_dir, target_filename)
 
-        convert_file(source_path, target_path)
+        convert_file(source_path, target_path, skip)
 
 
-def convert_file(source_path: str, target_path: str) -> None:
+def convert_file(source_path: str, target_path: str, skip: bool) -> None:
     """
     Convert a single file from mtx to npz.
     """
 
     # Make sure we're not about to overwrite something:
     if os.path.isfile(target_path):
-        raise FileExistsError(target_path)
+        if skip:
+            logger.info(f"{os.path.basename(target_path)} already exists, so skipping {os.path.basename(source_path)}")
+            return
+        else:
+            raise FileExistsError(target_path)
 
     # Load and convert the file
     logger.info(f"Loading {os.path.basename(source_path)}")
@@ -221,11 +233,12 @@ if __name__ == '__main__':
     logging.basicConfig(format=logger_format, datefmt=logger_dateformat, level=logging.INFO)
     logger.info("Running %s" % " ".join(sys.argv))
 
-    parser = argparse.ArgumentParser(description='Convert matrix market text files to numpy ndarray npz files.')
+    parser = argparse.ArgumentParser(description='Convert matrix market text files to npz files.')
 
     parser.add_argument("source", type=str, help="Path to a .mtx file or a directory. Use '-r' flag for directories.")
-    parser.add_argument("--target", "-t", metavar="PATH", type=str, help="target file or directory")
-    parser.add_argument("--recursive", "-r", action="store_true", help="All files in source directory")
+    parser.add_argument("--target", "-t", metavar="PATH", type=str, help="Target file or directory.")
+    parser.add_argument("--recursive", "-r", action="store_true", help="All files in source directory.")
+    parser.add_argument("--skip", "-s", action="store_true", help="Skip existing files.")
 
     main(parser.parse_args())
 
