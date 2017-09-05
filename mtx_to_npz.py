@@ -33,7 +33,8 @@ logger_dateformat = "%Y-%m-%d %H:%M:%S"
 
 class ExecutionMode(Enum):
     """
-    Where the file will be saved
+    The mode of execution for the program.
+    What it will do with paths specified in the CLI arguments.
     """
     # In the same directory, with the same name
     file_in_place = auto()
