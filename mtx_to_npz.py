@@ -14,12 +14,13 @@ caiwingfield.net
 2017
 ---------------------------
 """
-
+import glob
 import logging
 import os
 import sys
 import argparse
 
+from typing import List
 from enum import Enum, auto
 
 import scipy.io
@@ -30,66 +31,190 @@ logger_format = '%(asctime)s | %(levelname)s | %(module)s | %(message)s'
 logger_dateformat = "%Y-%m-%d %H:%M:%S"
 
 
-class TargetType(Enum):
+class ExecutionMode(Enum):
     """
     Where the file will be saved
     """
     # In the same directory, with the same name
-    in_place = auto()
+    file_in_place = auto()
     # In a target directory, with the same name
-    to_dir = auto()
+    file_to_dir = auto()
     # In a specified file
-    to_file = auto()
+    file_to_file = auto()
+    # All files in place
+    all_in_place = auto()
+    # All files to target directory, same names
+    all_to_dir = auto()
+
+
+source_ext = ".mtx"
+target_ext = ".npz"
 
 
 def main(args):
+    """
+    Entry point.
+    """
 
-    target_ext = ".npz"
+    validate_args(args)
 
-    # Parse args
-    source_path = args.source
-    if args.target:
-        if os.path.isdir(args.target):
-            target_type = TargetType.to_dir
-        else:
-            target_type = TargetType.to_file
+    mode = get_mode(args.recursive, args.target)
+
+    source_path, target_path = get_paths(args, mode)
+
+    do_conversion(mode, source_path, target_path)
+
+
+def do_conversion(mode, source_path, target_path):
+    """
+    Do the appropriate conversion based on program mode.
+    """
+    if mode in [
+        ExecutionMode.all_in_place,
+        ExecutionMode.all_to_dir
+    ]:
+        # Get all source files
+        source_paths = glob.glob(os.path.join(source_path, "*" + source_ext))
+        convert_files(source_paths, target_path)
+
     else:
-        target_type = TargetType.in_place
+        convert_file(source_path, target_path)
 
-    # Determine target path
-    if target_type == TargetType.to_file:
-        logger.info("Mode: save to file")
-        target_path: str = args.target
+
+def get_paths(args, mode: ExecutionMode):
+    """
+    Determine the source and target paths.
+    """
+
+    if mode == ExecutionMode.file_to_file:
+        source_dir, source_filename = os.path.split(args.source)
+        # Different name, different dir
+        target_dir, target_filename = os.path.split(args.target)
         # Verify filename
-        if not target_path.endswith(target_ext):
-            target_path += target_ext
-    elif target_type == TargetType.to_dir:
-        logger.info("Mode: save to directory")
+        if not target_filename.endswith(target_ext):
+            target_filename += target_ext
+
+    elif mode == ExecutionMode.file_to_dir:
+        source_dir, source_filename = os.path.split(args.source)
         # Same name, target dir
-        target_path: str = os.path.join(
-            args.target,
-            os.path.splitext(os.path.basename(source_path))[0] + target_ext)
-    elif target_type == TargetType.in_place:
-        logger.info("Mode: saving in place")
+        target_dir = args.target
+        target_filename = os.path.splitext(os.path.basename(args.source))[0] + target_ext
+
+    elif mode == ExecutionMode.file_in_place:
+        source_dir = args.source
+        source_filename = None
         # same name, same dir
-        target_path = os.path.splitext(source_path)[0] + target_ext
+        target_dir = os.path.split(args.source)[0]
+        target_filename = os.path.splitext(os.path.basename(args.source))[0] + target_ext
+
+    elif mode == ExecutionMode.all_to_dir:
+        source_dir = args.source
+        source_filename = None
+        # same names, target dir
+        target_dir = args.target
+        target_filename = None
+
+    elif mode == ExecutionMode.all_in_place:
+        source_dir = args.source
+        source_filename = None
+        # same names, same dir
+        target_dir = args.source
+        target_filename = None
+
     else:
         raise ValueError()
 
-    # Check files
-    if not os.path.isfile(source_path):
-        raise FileNotFoundError(source_path)
+    # Source is file or directory?
+    if source_filename is None:
+        source_path = source_dir
+    else:
+        source_path = os.path.join(source_dir, source_filename)
+
+    # Target is file or directory?
+    if target_filename is None:
+        target_path = target_dir
+    else:
+        target_path = os.path.join(target_dir, target_filename)
+
+    return source_path, target_path
+
+
+def validate_args(args):
+    """
+    Make sure specified args are in a legal state.
+    """
+
+    # recursive => source is dir
+    if args.recursive and not os.path.isdir(args.source):
+        logger.error("Use recursive option with and only with directories.")
+        raise NotADirectoryError(args.source)
+
+    # recursive => target is dir (if specified)
+    if args.recursive and args.target and not os.path.isdir(args.target):
+        logger.error("Use recursive option with and only with directories.")
+        raise NotADirectoryError(args.target)
+
+    # source is dir => recursive
+    if os.path.isdir(args.source) and not args.recursive:
+        logger.error("Use recursive option with and only with directories.")
+        raise NotADirectoryError(args.source)
+
+
+def get_mode(recursive: bool, target: str) -> ExecutionMode:
+    """
+    Determine the mode of execution of the program.
+    """
+
+    if recursive:
+        if target:
+            logger.info("Mode: Converting all files to target directory")
+            return ExecutionMode.all_to_dir
+        else:
+            logger.info("Mode: Converting all files in place")
+            return ExecutionMode.all_in_place
+    else:
+        if target:
+            if os.path.isdir(target):
+                logger.info("Mode: Convert file to target directory")
+                return ExecutionMode.file_to_dir
+            else:
+                logger.info("Mode: Convert file to target file")
+                return ExecutionMode.file_to_file
+        else:
+            logger.info("Mode: Convert file in place")
+            return ExecutionMode.file_in_place
+
+
+def convert_files(source_paths: List[str], target_dir: str) -> None:
+    """
+    Convert multiple files from mtx to npz.
+    """
+    for source_path in source_paths:
+
+        source_filename = os.path.basename(source_path)
+        target_filename = os.path.splitext(source_filename)[0] + target_ext
+        target_path = os.path.join(target_dir, target_filename)
+
+        convert_file(source_path, target_path)
+
+
+def convert_file(source_path: str, target_path: str) -> None:
+    """
+    Convert a single file from mtx to npz.
+    """
+
+    # Make sure we're not about to overwrite something:
     if os.path.isfile(target_path):
         raise FileExistsError(target_path)
 
-    # Do the work
-
+    # Load and convert the file
     logger.info(f"Loading {os.path.basename(source_path)}")
     matrix = scipy.io.mmread(source_path).tocsr()
 
+    # Save the file
     logger.info(f"Saving {os.path.basename(target_path)}")
-    # Don't compress, to save memory
-    scipy.sparse.save_npz(target_path, matrix, compressed=False)  # TODO: does this actually save memory?
+    # Don't compress, to save memory.  TODO: does this actually save memory?
+    scipy.sparse.save_npz(target_path, matrix, compressed=False)
 
 
 if __name__ == '__main__':
@@ -98,8 +223,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Convert matrix market text files to numpy ndarray npz files.')
 
-    parser.add_argument("source", type=str, help=".mtx file")
+    parser.add_argument("source", type=str, help="Path to a .mtx file or a directory. Use '-r' flag for directories.")
     parser.add_argument("--target", "-t", metavar="PATH", type=str, help="target file or directory")
+    parser.add_argument("--recursive", "-r", action="store_true", help="All files in source directory")
 
     main(parser.parse_args())
 
