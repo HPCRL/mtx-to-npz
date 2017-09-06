@@ -11,6 +11,11 @@ Convert `.mtx` files to `.npz` files.
 Convert `.npz` files to `.mtx` files.
 This will only work if the `.npz` files were generated using `scipy.sparse.savenz`.
 
+### Dense versions
+
+Don't worry about these.
+They need to be run with `python -m` from above the root, and they're probably not good for general use yet anyway.
+
 ## Options
 
 Invoke like this:

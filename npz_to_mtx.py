@@ -14,6 +14,7 @@ caiwingfield.net
 2017
 ---------------------------
 """
+
 import argparse
 import sys
 import logging
@@ -22,7 +23,7 @@ import os
 import scipy.io
 import scipy.sparse
 
-from common import Converter, logger_format, logger_dateformat
+from common.common import Converter, logger_format, logger_dateformat
 
 logger = logging.getLogger()
 
